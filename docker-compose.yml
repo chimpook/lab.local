@@ -1,0 +1,65 @@
+version: '3.7'
+
+networks:
+  main:
+    driver: bridge
+
+services:
+
+  pgsql:
+    image: postgres:${PGSQL_VERSION}
+    container_name: pgsql
+    ports:
+      - "${PGSQL_PORT}:5432"
+#    volumes:
+#      - "./srv/pgsql/data:/var/lib/postgresql/data"
+    environment:
+      POSTGRES_PASSWORD: ${PGSQL_PASSWORD}
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:${MYSQL_VERSION}
+    ports:
+      - "${MYSQL_PORT}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: '${MYSQL_PASSWORD}'
+    volumes:
+#      - "${PWD}/store/mysql:/var/lib/mysql"
+      - "${PWD}/srv/mysql/initdb:/docker-entrypoint-initdb.d"
+    networks:
+      - main
+    restart: unless-stopped
+
+  proxy:
+    image: nginx:${NGINX_VERSION}
+    container_name: proxy
+    volumes:
+      - "./srv/proxy/conf.d:/etc/nginx/conf.d"
+    ports:
+      - "80:80"
+#    extra_hosts:
+#      - "app1.phplab.local:127.0.0.1"
+#      - "app2.phplab.local:127.0.0.1"
+    links:
+      - phpapps
+    networks:
+      - main
+    restart: always
+
+  phpapps:
+    build:
+      context: ./srv/phpapps
+      dockerfile: Dockerfile
+      args: 
+        PHP_VERSION: "${PHPAPPS_PHP_VERSION}"
+    image: phpapps
+    container_name: phpapps
+    volumes:
+      - "./src:/var/www"
+    networks:
+      - main
+    depends_on:
+      - mysql
+      - pgsql
+    restart: unless-stopped
+
